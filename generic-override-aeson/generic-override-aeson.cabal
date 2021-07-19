@@ -43,6 +43,7 @@ test-suite generic-override-aeson-test
   main-is: Test.hs
   other-modules:
       LispCaseAeson
+      OmitNothingFieldsAeson
       Paths_generic_override_aeson
   hs-source-dirs:
       test

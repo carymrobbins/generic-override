@@ -6,6 +6,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -20,6 +21,7 @@ import Data.Override.Aeson ()
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import LispCaseAeson (LispCase(LispCase))
+import OmitNothingFieldsAeson (OmitNothingFields(OmitNothingFields))
 import qualified Data.Text as Text
 import Test.Hspec
 import Text.Read (readMaybe)
@@ -34,6 +36,10 @@ main = hspec do
     it "Rec5" testRec5
     it "Rec6" testRec6
     it "Rec7" testRec6
+    it "Rec8" testRec8
+    it "Rec8 with Nothing field" testRec8_Nothing
+    it "Rec9 with L constructor" testRec9_L
+    it "Rec9 with R constructor" testRec9_R
 
 newtype Uptext = Uptext { unUptext :: Text }
 
@@ -233,3 +239,70 @@ testRec7 = do
   |]
   toJSON r `shouldBe` j
   fromJSON j `shouldBe` Success r
+
+newtype Dummy a = Dummy a
+  deriving stock (Show, Eq, Generic)
+  deriving newtype (FromJSON, ToJSON)
+
+data Rec8 = Rec8
+  { foo :: Int
+  , bar :: Maybe Text
+  } deriving stock (Show, Eq, Generic)
+    deriving (ToJSON, FromJSON)
+      via OmitNothingFields (Override Rec8
+            '[ "foo" `With` Dummy
+             ])
+
+testRec8 :: IO ()
+testRec8 = do
+  let r = Rec8 { foo = 1, bar = Just "hi" }
+  let j = [aesonQQ|
+    {
+      "foo": 1,
+      "bar": "hi"
+    }
+  |]
+  toJSON r `shouldBe` j
+  fromJSON j `shouldBe` Success r
+
+testRec8_Nothing :: IO ()
+testRec8_Nothing = do
+  let r = Rec8 { foo = 1, bar = Nothing }
+  let j = [aesonQQ|
+    {
+      "foo": 1
+    }
+  |]
+  toJSON r `shouldBe` j
+  fromJSON j `shouldBe` Success r
+
+data Rec9
+  = Rec9_L { foo :: Int }
+  | Rec9_R { bar :: Text }
+  deriving stock (Show, Eq, Generic)
+  deriving (ToJSON)
+    via Override Rec9
+          '[ "bar" `As` Uptext
+           ]
+
+testRec9_L :: IO ()
+testRec9_L = do
+  let r = Rec9_L { foo = 1 }
+  let j = [aesonQQ|
+    {
+      "tag": "Rec9_L",
+      "foo": 1
+    }
+  |]
+  toJSON r `shouldBe` j
+
+testRec9_R :: IO ()
+testRec9_R = do
+  let r = Rec9_R { bar = "hi" }
+  let j = [aesonQQ|
+    {
+      "tag": "Rec9_R",
+      "bar": "HI"
+    }
+  |]
+  toJSON r `shouldBe` j
