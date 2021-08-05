@@ -16,7 +16,7 @@ module Main where
 import Data.Aeson (FromJSON(parseJSON), ToJSON(toJSON), Result(Success), fromJSON)
 import Data.Aeson.QQ.Simple (aesonQQ)
 import Data.Override (Override(Override), As, With)
-import Data.Override.Aeson ()
+import Data.Override.Aeson (OverrideAeson(OverrideAeson), OmitNothingFields)
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import LispCaseAeson (LispCase(LispCase))
@@ -33,7 +33,8 @@ main = hspec do
     it "Rec4" testRec4
     it "Rec5" testRec5
     it "Rec6" testRec6
-    it "Rec7" testRec6
+    it "Rec7" testRec7
+    it "Rec8" testRec8
 
 newtype Uptext = Uptext { unUptext :: Text }
 
@@ -233,3 +234,36 @@ testRec7 = do
   |]
   toJSON r `shouldBe` j
   fromJSON j `shouldBe` Success r
+
+-- Test 'OmitNothingFields'.
+data Rec8 = Rec8
+  { foo :: Int
+  , bar :: Maybe String
+  } deriving stock (Show, Eq, Generic)
+    deriving (ToJSON, FromJSON)
+      via OverrideAeson Rec8
+            '[ "foo" `With` Shown
+             ]
+            '[ OmitNothingFields 'True
+             ]
+
+testRec8 :: IO ()
+testRec8 = do
+  let r0 = Rec8 { foo = 1, bar = Nothing }
+  let j0 = [aesonQQ|
+    {
+      "foo": "1"
+    }
+  |]
+  toJSON r0 `shouldBe` j0
+  fromJSON j0 `shouldBe` Success r0
+
+  let r1 = Rec8 { foo = 1, bar = Just "hi" }
+  let j1 = [aesonQQ|
+    {
+      "foo": "1",
+      "bar": "hi"
+    }
+  |]
+  toJSON r1 `shouldBe` j1
+  fromJSON j1 `shouldBe` Success r1
